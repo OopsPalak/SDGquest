@@ -3,7 +3,7 @@ import cors from 'cors';
 import { db } from './data/mockDb.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3002;
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' })); // Support base64 drawings & photo uploads
