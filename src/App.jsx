@@ -4,12 +4,17 @@ import confetti from 'canvas-confetti';
 // Sound Synthesizer
 import { playBadgeUnlockSound, playLevelUpSound, playClickSound, playSuccessSound } from './audio/soundFx.js';
 
+// Auth & Entry Components
+import { AuthScreen } from './components/auth/AuthScreen.jsx';
+
 // Common Components
 import { RoleSwitcher } from './components/common/RoleSwitcher.jsx';
 import { Navigation } from './components/common/Navigation.jsx';
 
 // Child View Components
 import { ChildHome } from './components/child/ChildHome.jsx';
+import { LessonsView } from './components/child/LessonsView.jsx';
+import { QuizModal } from './components/child/QuizModal.jsx';
 import { SDGGrid } from './components/child/SDGGrid.jsx';
 import { SDGDetailModal } from './components/child/SDGDetailModal.jsx';
 import { MissionScreen } from './components/child/MissionScreen.jsx';
@@ -24,28 +29,40 @@ import { TeacherDashboard } from './components/teacher/TeacherDashboard.jsx';
 import { CertificateGen } from './components/teacher/CertificateGen.jsx';
 import { ParentDashboard } from './components/parent/ParentDashboard.jsx';
 
-// Constants
-import { INITIAL_MISSIONS, INITIAL_BOOK_PAGES, SDGS_DATA } from './utils/constants.js';
+// Constants & Lessons Data
+import { INITIAL_MISSIONS, INITIAL_BOOK_PAGES, SDGS_DATA, LEVELS } from './utils/constants.js';
+import { LESSONS_DATA } from './utils/lessonsData.js';
+
+// Helper to compute level from XP dynamically
+function computeLevel(xp) {
+  if (xp >= 1000) return { level: 5, levelName: 'SDG Champion' };
+  if (xp >= 600) return { level: 4, levelName: 'Community Hero' };
+  if (xp >= 300) return { level: 3, levelName: 'Change Maker' };
+  if (xp >= 100) return { level: 2, levelName: 'Earth Friend' };
+  return { level: 1, levelName: 'SDG Explorer' };
+}
 
 export default function App() {
+  // Authentication & Role State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState('child'); // 'child' | 'teacher' | 'parent'
-  const [activeTab, setActiveTab] = useState('home'); // 'home' | 'sdgs' | 'book' | 'badges' | 'profile' | 'summer'
+  const [activeTab, setActiveTab] = useState('home'); // 'home' | 'learn' | 'missions' | 'book' | 'badges' | 'profile' | 'summer'
   const [soundOn, setSoundOn] = useState(true);
 
-  // App Data States
+  // Student Profile State (Starts clean for new users)
   const [childProfile, setChildProfile] = useState({
-    name: 'Leo',
-    xp: 210,
-    level: 2,
-    levelName: 'Earth Friend',
-    streak: 4,
-    unlockedBadges: ['water_saver', 'nature_protector', 'waste_warrior'],
-    pagesCount: 3,
+    name: 'Explorer',
+    xp: 0,
+    level: 1,
+    levelName: 'SDG Explorer',
+    streak: 1,
+    unlockedBadges: [],
+    pagesCount: 0,
     avatar: {
       skin: '#FFD1A4',
       hair: '#8D5B4C',
-      style: 'Short Curly',
-      outfit: 'Water Guardian Hoodie',
+      style: 'Adventure Cap',
+      outfit: 'Eco Adventurer Tee',
       accessory: 'Eco Backpack 🎒'
     }
   });
@@ -53,32 +70,45 @@ export default function App() {
   const [sdgs, setSdgs] = useState(SDGS_DATA);
   const [missions, setMissions] = useState(INITIAL_MISSIONS);
   const [submissions, setSubmissions] = useState([]);
-  const [bookPages, setBookPages] = useState(INITIAL_BOOK_PAGES);
-  const [teacherData, setTeacherData] = useState(null);
-  const [parentDigest, setParentDigest] = useState(null);
-  const [summerData, setSummerData] = useState({ currentDay: 12, completedDays: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] });
+  const [bookPages, setBookPages] = useState([]);
+  const [completedQuizzes, setCompletedQuizzes] = useState({});
+  const [teacherData, setTeacherData] = useState({
+    name: 'Ms. Clara Vance',
+    className: 'Class 5A',
+    totalStudents: 32,
+    completionRate: 84
+  });
+  const [parentDigest, setParentDigest] = useState({
+    parentName: 'Sarah & David',
+    childName: 'Explorer'
+  });
+  const [summerData, setSummerData] = useState({ currentDay: 1, totalDays: 30, completedDays: [] });
 
   // Selected state for modals & screens
   const [selectedSdg, setSelectedSdg] = useState(null);
   const [selectedMission, setSelectedMission] = useState(null);
   const [isSubmittingMission, setIsSubmittingMission] = useState(null);
   const [showCertificateGen, setShowCertificateGen] = useState(false);
+  const [activeQuizLesson, setActiveQuizLesson] = useState(null);
 
   // Victory Celebration Modal State
   const [celebrationData, setCelebrationData] = useState(null);
 
-  // Fetch initial data from backend API with fallback
+  // Load initial backend data or localStorage session if available
   useEffect(() => {
-    fetch('/api/profile')
-      .then(res => res.json())
-      .then(data => setChildProfile(data))
-      .catch(() => {});
+    const savedSession = localStorage.getItem('sdg_user_session');
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        setIsLoggedIn(true);
+        setRole(parsed.role || 'child');
+        if (parsed.profile) setChildProfile(parsed.profile);
+        if (parsed.bookPages) setBookPages(parsed.bookPages);
+        if (parsed.completedQuizzes) setCompletedQuizzes(parsed.completedQuizzes);
+      } catch (e) {}
+    }
 
-    fetch('/api/sdgs')
-      .then(res => res.json())
-      .then(data => setSdgs(data))
-      .catch(() => {});
-
+    // Try fetching from backend API (optional fallback)
     fetch('/api/missions')
       .then(res => res.json())
       .then(data => setMissions(data))
@@ -87,11 +117,6 @@ export default function App() {
     fetch('/api/submissions')
       .then(res => res.json())
       .then(data => setSubmissions(data))
-      .catch(() => {});
-
-    fetch('/api/book-pages')
-      .then(res => res.json())
-      .then(data => setBookPages(data))
       .catch(() => {});
 
     fetch('/api/teacher')
@@ -103,74 +128,162 @@ export default function App() {
       .then(res => res.json())
       .then(data => setParentDigest(data))
       .catch(() => {});
-
-    fetch('/api/summer')
-      .then(res => res.json())
-      .then(data => setSummerData(data))
-      .catch(() => {});
   }, []);
 
+  // Save session state to localStorage
+  const saveSession = (newRole, newProfile, newPages, newQuizzes) => {
+    try {
+      localStorage.setItem('sdg_user_session', JSON.stringify({
+        role: newRole || role,
+        profile: newProfile || childProfile,
+        bookPages: newPages || bookPages,
+        completedQuizzes: newQuizzes || completedQuizzes
+      }));
+    } catch (e) {}
+  };
+
+  // Auth Handler: called from AuthScreen
+  const handleLoginSuccess = (selectedRole, profileData, isSampleData = false) => {
+    setRole(selectedRole);
+    setIsLoggedIn(true);
+    setActiveTab('home');
+
+    if (selectedRole === 'child') {
+      const studentProfile = {
+        name: profileData.name || 'Explorer',
+        xp: profileData.xp || 0,
+        level: profileData.level || 1,
+        levelName: profileData.levelName || 'SDG Explorer',
+        streak: profileData.streak || 1,
+        unlockedBadges: profileData.unlockedBadges || [],
+        pagesCount: isSampleData ? 3 : (profileData.pagesCount || 0),
+        avatar: profileData.avatar || {
+          skin: '#FFD1A4',
+          hair: '#8D5B4C',
+          style: 'Adventure Hat',
+          outfit: 'Eco Adventurer Tee',
+          accessory: 'Eco Backpack 🎒'
+        }
+      };
+
+      const startingPages = isSampleData ? INITIAL_BOOK_PAGES : [];
+      setChildProfile(studentProfile);
+      setBookPages(startingPages);
+      saveSession('child', studentProfile, startingPages, {});
+    } else if (selectedRole === 'teacher') {
+      setTeacherData(prev => ({ ...prev, ...profileData }));
+      saveSession('teacher', childProfile, bookPages, completedQuizzes);
+    } else if (selectedRole === 'parent') {
+      setParentDigest(prev => ({ ...prev, ...profileData }));
+      saveSession('parent', childProfile, bookPages, completedQuizzes);
+    }
+  };
+
+  // Switch User / Logout: Returns to AuthScreen
+  const handleSwitchUser = () => {
+    playClickSound();
+    setIsLoggedIn(false);
+  };
+
   // Handler to start a mission
-  const handleStartMission = (mission) => {
-    setSelectedMission(mission);
+  const handleStartMission = (missionOrId) => {
+    let missionObj = null;
+    if (typeof missionOrId === 'string') {
+      missionObj = missions.find(m => m.id === missionOrId) || missions[0];
+    } else {
+      missionObj = missionOrId;
+    }
+    setSelectedMission(missionObj);
     setActiveTab('mission_detail');
+  };
+
+  // Handler to open quiz
+  const handleOpenQuiz = (lesson) => {
+    setActiveQuizLesson(lesson);
+  };
+
+  // Handler when quiz is completed
+  const handleQuizComplete = (sdgId, score, totalQ, xpEarned) => {
+    const newXp = childProfile.xp + xpEarned;
+    const { level, levelName } = computeLevel(newXp);
+    const newQuizzes = { ...completedQuizzes, [sdgId]: { score, totalQ, completedAt: new Date().toISOString() } };
+
+    const updatedProfile = {
+      ...childProfile,
+      xp: newXp,
+      level,
+      levelName
+    };
+
+    setChildProfile(updatedProfile);
+    setCompletedQuizzes(newQuizzes);
+    saveSession(role, updatedProfile, bookPages, newQuizzes);
+
+    // Also notify backend if available
+    fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ xp: newXp, level, levelName })
+    }).catch(() => {});
   };
 
   // Handler when evidence is submitted
   const handleSubmitComplete = (payload) => {
-    // Send to server API
+    const xpReward = selectedMission?.xpReward || 50;
+    const newXp = childProfile.xp + xpReward;
+    const { level, levelName } = computeLevel(newXp);
+
+    const badgeId = selectedMission?.badgeId || 'water_saver';
+    const unlockedBadges = [...childProfile.unlockedBadges];
+    if (badgeId && !unlockedBadges.includes(badgeId)) {
+      unlockedBadges.push(badgeId);
+    }
+
+    const newPage = {
+      id: `page_${Date.now()}`,
+      sdgId: selectedMission?.sdgId || 6,
+      sdgNumber: selectedMission?.sdgNumber || 6,
+      title: selectedMission?.title || 'Eco Adventure',
+      date: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      caption: payload.caption || 'Completed real-world sustainability challenge!',
+      type: payload.type || 'photo',
+      mediaUrl: payload.mediaUrl,
+      frame: payload.frame || 'water',
+      stickers: payload.stickers || ['💧', '⭐'],
+      xpEarned: xpReward,
+      badgeName: selectedMission?.badgeName || 'SDG Achiever',
+      badgeIcon: selectedMission?.badgeIcon || '⭐',
+      author: childProfile.name
+    };
+
+    const newPages = [...bookPages, newPage];
+
+    const updatedProfile = {
+      ...childProfile,
+      xp: newXp,
+      level,
+      levelName,
+      unlockedBadges,
+      pagesCount: newPages.length
+    };
+
+    setChildProfile(updatedProfile);
+    setBookPages(newPages);
+    saveSession(role, updatedProfile, newPages, completedQuizzes);
+
+    // Also notify server backend if active
     fetch('/api/submissions?autoApprove=true', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(res => res.json())
-      .then(result => {
-        if (result.childProfile) {
-          setChildProfile(result.childProfile);
-        }
-        if (result.bookPages) {
-          setBookPages(result.bookPages);
-        }
-      })
-      .catch(() => {
-        // Local fallback calculation
-        const xpEarned = selectedMission?.xpReward || 50;
-        const newXp = childProfile.xp + xpEarned;
-        let newLevel = childProfile.level;
-        let newLevelName = childProfile.levelName;
-        if (newXp >= 300 && childProfile.level < 3) {
-          newLevel = 3;
-          newLevelName = 'Change Maker';
-        }
+      body: JSON.stringify({ ...payload, childName: childProfile.name })
+    }).catch(() => {});
 
-        const newPage = {
-          id: `page_${Date.now()}`,
-          sdgId: selectedMission?.sdgId || 6,
-          sdgNumber: selectedMission?.sdgNumber || 6,
-          title: selectedMission?.title || 'Eco Action',
-          date: 'Sept 2026',
-          caption: payload.caption || 'Mission completed!',
-          type: payload.type,
-          mediaUrl: payload.mediaUrl,
-          frame: payload.frame,
-          stickers: payload.stickers,
-          xpEarned: xpEarned,
-          badgeName: selectedMission?.badgeName || 'Water Saver',
-          badgeIcon: selectedMission?.badgeIcon || '💧',
-          author: childProfile.name
-        };
-
-        setChildProfile(prev => ({ ...prev, xp: newXp, level: newLevel, levelName: newLevelName }));
-        setBookPages(prev => [...prev, newPage]);
-      });
-
-    // Trigger celebration effects!
+    // Trigger celebration modal with confetti & audio
     triggerCelebration({
-      xpEarned: selectedMission?.xpReward || 50,
-      badgeName: selectedMission?.badgeName || 'Water Saver',
-      badgeIcon: selectedMission?.badgeIcon || '💧',
-      missionTitle: selectedMission?.title || 'Eco Challenge'
+      xpEarned: xpReward,
+      badgeName: selectedMission?.badgeName || 'SDG Achiever',
+      badgeIcon: selectedMission?.badgeIcon || '⭐',
+      missionTitle: selectedMission?.title || 'Eco Action'
     });
 
     setIsSubmittingMission(null);
@@ -182,8 +295,8 @@ export default function App() {
   const triggerCelebration = (data) => {
     try {
       confetti({
-        particleCount: 120,
-        spread: 80,
+        particleCount: 130,
+        spread: 85,
         origin: { y: 0.6 }
       });
     } catch (e) {}
@@ -211,47 +324,60 @@ export default function App() {
 
   // Teacher custom mission creator
   const handleCreateMission = (newMission) => {
+    const fullMission = {
+      ...newMission,
+      id: `m_custom_${Date.now()}`,
+      status: 'available',
+      checklistItems: ['Plan Action 📝', 'Perform Eco Habit 🌿', 'Reflect & Share 💬']
+    };
+
     fetch('/api/missions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newMission)
+      body: JSON.stringify(fullMission)
     })
       .then(res => res.json())
       .then(saved => setMissions(prev => [...prev, saved]))
       .catch(() => {
-        setMissions(prev => [...prev, { ...newMission, id: `m_${Date.now()}` }]);
+        setMissions(prev => [...prev, fullMission]);
       });
   };
 
   // Summer day complete handler
   const handleCompleteSummerDay = (dayNum) => {
-    fetch('/api/summer/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ day: dayNum })
-    })
-      .then(res => res.json())
-      .then(updated => setSummerData(updated))
-      .catch(() => {
-        setSummerData(prev => ({
-          ...prev,
-          completedDays: [...prev.completedDays, dayNum]
-        }));
-      });
-
-    setChildProfile(prev => ({ ...prev, xp: prev.xp + 20 }));
+    if (!summerData.completedDays.includes(dayNum)) {
+      const updated = {
+        ...summerData,
+        completedDays: [...summerData.completedDays, dayNum]
+      };
+      setSummerData(updated);
+      const newXp = childProfile.xp + 20;
+      const { level, levelName } = computeLevel(newXp);
+      const updatedProfile = { ...childProfile, xp: newXp, level, levelName };
+      setChildProfile(updatedProfile);
+      saveSession(role, updatedProfile, bookPages, completedQuizzes);
+    }
   };
 
+  // If not logged in, render the Role Selection / Entry screen!
+  if (!isLoggedIn) {
+    return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+    <div className="min-h-screen bg-living-planet flex flex-col justify-between font-sans">
       {/* Top Header Role Switcher Bar */}
       <RoleSwitcher
         currentRole={role}
         onRoleChange={(r) => {
           setRole(r);
           setShowCertificateGen(false);
+          setActiveTab('home');
         }}
+        onSwitchUser={handleSwitchUser}
         childProfile={childProfile}
+        teacherData={teacherData}
+        parentDigest={parentDigest}
         soundOn={soundOn}
         setSoundOn={setSoundOn}
       />
@@ -270,7 +396,15 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'sdgs' && (
+            {activeTab === 'learn' && (
+              <LessonsView
+                onOpenQuiz={handleOpenQuiz}
+                onStartMission={handleStartMission}
+                completedQuizzes={completedQuizzes}
+              />
+            )}
+
+            {activeTab === 'missions' && (
               <SDGGrid
                 sdgs={sdgs}
                 onSelectSdg={(sdg) => setSelectedSdg(sdg)}
@@ -282,6 +416,7 @@ export default function App() {
                 bookPages={bookPages}
                 childName={childProfile.name}
                 onBackToHome={() => setActiveTab('home')}
+                onNavigateToMissions={() => setActiveTab('missions')}
               />
             )}
 
@@ -293,7 +428,9 @@ export default function App() {
               <AvatarBuilder
                 childProfile={childProfile}
                 onSaveAvatar={(av) => {
-                  setChildProfile(prev => ({ ...prev, avatar: av }));
+                  const updatedProfile = { ...childProfile, avatar: av };
+                  setChildProfile(updatedProfile);
+                  saveSession('child', updatedProfile, bookPages, completedQuizzes);
                   fetch('/api/profile', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -313,7 +450,7 @@ export default function App() {
             {activeTab === 'mission_detail' && (
               <MissionScreen
                 mission={selectedMission}
-                onBack={() => setActiveTab('home')}
+                onBack={() => setActiveTab('missions')}
                 onSubmitEvidence={(m) => {
                   setIsSubmittingMission(m);
                   setActiveTab('submission_studio');
@@ -367,11 +504,25 @@ export default function App() {
         />
       )}
 
-      {/* Selected SDG Detail Story Modal */}
+      {/* Interactive SDG Hub Modal */}
       {selectedSdg && (
         <SDGDetailModal
           sdg={selectedSdg}
           onClose={() => setSelectedSdg(null)}
+          onStartMission={handleStartMission}
+          onOpenQuiz={handleOpenQuiz}
+          bookPages={bookPages}
+          unlockedBadges={childProfile.unlockedBadges}
+          completedQuizzes={completedQuizzes}
+        />
+      )}
+
+      {/* Interactive Quiz Mini-Game Modal */}
+      {activeQuizLesson && (
+        <QuizModal
+          lesson={activeQuizLesson}
+          onClose={() => setActiveQuizLesson(null)}
+          onComplete={handleQuizComplete}
           onStartMission={handleStartMission}
         />
       )}
@@ -382,7 +533,7 @@ export default function App() {
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-4 shadow-2xl border-4 border-amber-300 animate-float my-auto">
             <div className="text-7xl animate-bounce">✨</div>
 
-            <div className="bg-amber-100 text-amber-950 font-black text-xs uppercase px-3 py-1 rounded-full border border-amber-300 inline-block">
+            <div className="bg-amber-100 text-amber-950 font-black text-xs uppercase px-3.5 py-1 rounded-full border border-amber-300 inline-block tracking-wider">
               MISSION COMPLETED! 🎉
             </div>
 

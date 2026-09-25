@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Filter, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Search, Filter, Sparkles, CheckCircle2, ArrowRight, Star, Globe } from 'lucide-react';
 import { SDGS_DATA } from '../../utils/constants.js';
+import { SdgEmblem } from '../common/SdgArtwork.jsx';
 import { playClickSound } from '../../audio/soundFx.js';
 
 export function SDGGrid({ sdgs = SDGS_DATA, onSelectSdg }) {
@@ -25,13 +26,14 @@ export function SDGGrid({ sdgs = SDGS_DATA, onSelectSdg }) {
       {/* Title & Pitch */}
       <div className="text-center space-y-2">
         <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full border border-emerald-300">
-          ✨ 17 Earth Missions
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+          <span>17 Earth Goals</span>
         </span>
         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
           Explore the Sustainable Goals
         </h1>
         <p className="text-slate-600 text-sm font-medium max-w-xl mx-auto">
-          Choose an SDG card below to read its adventure story and complete real-world missions!
+          Choose an SDG card below to read its adventure story, watch videos, and take action!
         </p>
       </div>
 
@@ -53,33 +55,36 @@ export function SDGGrid({ sdgs = SDGS_DATA, onSelectSdg }) {
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => { playClickSound(); setFilter('all'); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               filter === 'all'
                 ? 'bg-slate-900 text-white shadow'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            All 17 SDGs 🌎
+            <Globe className="w-3.5 h-3.5" />
+            <span>All 17 SDGs</span>
           </button>
           <button
             onClick={() => { playClickSound(); setFilter('core'); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               filter === 'core'
                 ? 'bg-emerald-600 text-white shadow'
                 : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
             }`}
           >
-            ⭐ Focus 5 SDGs
+            <Star className="w-3.5 h-3.5" />
+            <span>Focus 5 SDGs</span>
           </button>
           <button
             onClick={() => { playClickSound(); setFilter('completed'); }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               filter === 'completed'
                 ? 'bg-amber-500 text-white shadow'
                 : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
             }`}
           >
-            ✅ In Progress
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>In Progress</span>
           </button>
         </div>
       </div>
@@ -98,18 +103,17 @@ export function SDGGrid({ sdgs = SDGS_DATA, onSelectSdg }) {
             >
               {/* Core Badge */}
               {isCore && (
-                <span className="absolute top-3 right-3 bg-amber-400 text-amber-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow border border-amber-200">
-                  MVP FOCUS ⭐
+                <span className="absolute top-3 right-3 bg-amber-400 text-amber-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow border border-amber-200 flex items-center gap-1">
+                  <span>FOCUS</span>
+                  <Star className="w-2.5 h-2.5 fill-amber-950" />
                 </span>
               )}
 
               <div>
                 {/* Header icon + SDG number */}
                 <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={`w-14 h-14 rounded-2xl text-3xl flex items-center justify-center text-white font-black shadow-md ${sdg.bgColor} group-hover:scale-110 transition-transform`}
-                  >
-                    {sdg.icon}
+                  <div className="group-hover:scale-105 transition-transform shrink-0">
+                    <SdgEmblem sdgNumber={sdg.number} size="md" />
                   </div>
                   <div>
                     <div className="text-[11px] font-extrabold text-slate-500 tracking-wider uppercase">

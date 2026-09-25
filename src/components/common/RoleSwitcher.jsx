@@ -1,8 +1,18 @@
 import React from 'react';
-import { Volume2, VolumeX, Sparkles, UserCheck, GraduationCap, Heart, Shield } from 'lucide-react';
-import { isSoundEnabled, toggleSound, playClickSound } from '../../audio/soundFx.js';
+import { Volume2, VolumeX, Sparkles, GraduationCap, Heart, User, ArrowRightLeft, Globe } from 'lucide-react';
+import { AvatarDisplay } from '../child/AvatarDisplay.jsx';
+import { toggleSound, playClickSound } from '../../audio/soundFx.js';
 
-export function RoleSwitcher({ currentRole, onRoleChange, childProfile, soundOn, setSoundOn }) {
+export function RoleSwitcher({
+  currentRole,
+  onRoleChange,
+  onSwitchUser,
+  childProfile,
+  teacherData,
+  parentDigest,
+  soundOn,
+  setSoundOn
+}) {
   const handleSoundToggle = () => {
     const newState = toggleSound();
     setSoundOn(newState);
@@ -17,64 +27,68 @@ export function RoleSwitcher({ currentRole, onRoleChange, childProfile, soundOn,
           onClick={() => { onRoleChange('child'); playClickSound(); }}
           className="flex items-center gap-2.5 cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center text-2xl shadow-md group-hover:scale-105 transition-transform">
-            🌎
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform overflow-hidden p-1.5">
+            <svg viewBox="0 0 40 40" className="w-full h-full drop-shadow">
+              <circle cx="20" cy="20" r="18" fill="#0284c7" />
+              <path d="M10 16 Q18 12 24 16 Q28 20 22 28 Q14 30 10 24 Z" fill="#22c55e" />
+              <path d="M22 8 Q28 10 32 14 Q30 18 26 16 Z" fill="#22c55e" />
+              <circle cx="28" cy="12" r="1.5" fill="#facc15" />
+            </svg>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-outfit font-extrabold text-xl text-slate-900 tracking-tight">SDG QUEST</span>
-              <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                K-5 Adventure
+              <span className="font-sans font-black text-xl text-slate-900 tracking-tight">SDG QUEST</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full border border-emerald-300">
+                Eco Adventure
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 hidden sm:block">Learn • Do • Collect • Save the Planet</p>
+            <p className="text-[11px] text-slate-500 font-semibold hidden sm:block">Learn • Do • Capture • Collect</p>
           </div>
         </div>
 
-        {/* Middle Role Switcher Pill */}
-        <div className="bg-slate-100 p-1 rounded-full flex items-center border border-slate-200 text-xs font-bold shadow-inner">
-          <button
-            onClick={() => { onRoleChange('child'); playClickSound(); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
-              currentRole === 'child'
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md scale-105'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span>👦</span>
-            <span>Child View</span>
-          </button>
+        {/* Middle Role Switcher Bar */}
+        <div className="flex items-center gap-2">
+          {/* Quick Active Role Pill */}
+          {currentRole === 'child' && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold bg-emerald-100 text-emerald-900 border-emerald-300 shadow-xs">
+              <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center overflow-hidden border border-emerald-300 shrink-0">
+                <AvatarDisplay avatar={childProfile?.avatar} size="xs" animated={false} />
+              </div>
+              <span className="font-black">{childProfile?.name || 'Student'}</span>
+            </div>
+          )}
 
-          <button
-            onClick={() => { onRoleChange('teacher'); playClickSound(); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
-              currentRole === 'teacher'
-                ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md scale-105'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <GraduationCap className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Teacher</span>
-          </button>
+          {currentRole === 'teacher' && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold bg-indigo-100 text-indigo-900 border-indigo-300 shadow-xs">
+              <GraduationCap className="w-4 h-4 text-indigo-700" />
+              <span className="font-black">{teacherData?.name || 'Ms. Clara Vance'}</span>
+            </div>
+          )}
 
+          {currentRole === 'parent' && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold bg-purple-100 text-purple-900 border-purple-300 shadow-xs">
+              <Heart className="w-4 h-4 text-purple-700 fill-purple-700" />
+              <span className="font-black">{parentDigest?.parentName || 'Parent Portal'}</span>
+            </div>
+          )}
+
+          {/* Switch Role Button */}
           <button
-            onClick={() => { onRoleChange('parent'); playClickSound(); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all ${
-              currentRole === 'parent'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md scale-105'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            onClick={() => { playClickSound(); onSwitchUser(); }}
+            className="btn-pop bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-sm"
+            title="Switch User Role or Log In"
           >
-            <Heart className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Parent</span>
+            <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden md:inline">Switch Role</span>
+            <span className="md:hidden">Roles</span>
           </button>
         </div>
 
         {/* Right Side Stats & Sound Toggle */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {currentRole === 'child' && childProfile && (
             <div className="hidden md:flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1 rounded-full text-xs font-bold">
-              <span className="text-sm">⭐</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
               <span>{childProfile.xp} XP</span>
               <span className="text-amber-300">|</span>
               <span>Lvl {childProfile.level}</span>

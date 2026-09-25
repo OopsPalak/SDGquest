@@ -1,6 +1,7 @@
 import React from 'react';
-import { Sparkles, Calendar, Award, Star } from 'lucide-react';
+import { Calendar, ImagePlus, Sprout } from 'lucide-react';
 import { SDGS_DATA, FRAMES } from '../../../utils/constants.js';
+import { CollectibleBadge, SdgEmblem } from '../../common/SdgArtwork.jsx';
 
 export function BookPage({ pageData, pageNumber, totalPages }) {
   if (!pageData) return null;
@@ -11,18 +12,16 @@ export function BookPage({ pageData, pageNumber, totalPages }) {
 
   return (
     <div className="relative w-full h-full min-h-[480px] bg-amber-50/70 p-6 rounded-2xl border border-amber-200 shadow-inner flex flex-col justify-between overflow-hidden">
-      {/* Background Subtle SDG Theme Watermark */}
-      <div className="absolute -right-8 -top-8 text-9xl opacity-10 select-none pointer-events-none">
-        {sdg.icon}
+      {/* Background SDG artwork watermark */}
+      <div className="absolute -right-3 -top-3 opacity-15 select-none pointer-events-none">
+        <SdgEmblem sdgNumber={sdg.number} size="xl" />
       </div>
 
       <div>
         {/* Page Top Header */}
         <div className="flex items-center justify-between pb-3 border-b-2 border-dashed border-amber-200 mb-4">
           <div className="flex items-center gap-2">
-            <span className={`w-8 h-8 rounded-xl ${sdg.bgColor} text-white font-black text-sm flex items-center justify-center shadow`}>
-              {sdg.icon}
-            </span>
+            <SdgEmblem sdgNumber={sdg.number} size="sm" />
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                 SDG {sdg.number} • {sdg.title}
@@ -52,13 +51,9 @@ export function BookPage({ pageData, pageNumber, totalPages }) {
               />
             </div>
 
-            {/* Sticker overlays */}
-            <div className="absolute -top-3 -right-3 flex items-center gap-1 pointer-events-none">
-              {pageData.stickers && pageData.stickers.map((s, idx) => (
-                <span key={idx} className="text-3xl filter drop-shadow">
-                  {s}
-                </span>
-              ))}
+            {/* Illustrated achievement marker */}
+            <div className="absolute -top-4 -right-4 pointer-events-none">
+              <CollectibleBadge badgeId={pageData.badgeId || 'water_saver'} size="sm" />
             </div>
           </div>
 
@@ -68,7 +63,7 @@ export function BookPage({ pageData, pageNumber, totalPages }) {
               "{pageData.caption}"
             </p>
             <p className="text-[11px] font-bold text-amber-800 mt-1">
-              — Completed by {pageData.author || 'Leo'} 🌱
+              — Completed by {pageData.author || 'Leo'}
             </p>
           </div>
         </div>
@@ -77,11 +72,11 @@ export function BookPage({ pageData, pageNumber, totalPages }) {
       {/* Page Footer Rewards & Number */}
       <div className="pt-3 border-t border-amber-200/60 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
-          <span className="bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-300">
-            ⭐ +{pageData.xpEarned || 50} XP
+            <span className="bg-emerald-100 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-300 inline-flex items-center gap-1">
+            <Sprout className="w-3.5 h-3.5" /> +{pageData.xpEarned || 50} XP
           </span>
           <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
-            <span>🏅</span>
+            <ImagePlus className="w-3.5 h-3.5" />
             <span>{pageData.badgeName || 'SDG Achiever'}</span>
           </span>
         </div>

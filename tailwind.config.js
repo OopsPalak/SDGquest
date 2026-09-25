@@ -7,8 +7,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        sans: ['Nunito', 'Quicksand', 'Fredoka', 'system-ui', 'sans-serif'],
+        nunito: ['Nunito', 'sans-serif'],
+        quicksand: ['Quicksand', 'sans-serif'],
         fredoka: ['Fredoka', 'sans-serif'],
-        outfit: ['Outfit', 'sans-serif'],
         handwriting: ['Patrick Hand', 'cursive']
       }
     },

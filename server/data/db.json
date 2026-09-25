@@ -14,11 +14,13 @@
       "waste_warrior"
     ],
     "avatar": {
-      "skin": "#E0A899",
-      "hair": "#8D5B4C",
-      "style": "Short Curly",
-      "outfit": "Solar Ranger Vest",
-      "accessory": "Binoculars 🔭"
+      "skin": "#FFD1A4",
+      "expression": "happy",
+      "hairStyle": "spiky",
+      "hairColor": "#6A381F",
+      "outfit": "eco_tee",
+      "accessory": "cool_shades",
+      "sdgItem": "none"
     }
   },
   "sdgs": [

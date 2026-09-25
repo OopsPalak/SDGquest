@@ -4,9 +4,14 @@
 
 @layer base {
   body {
-    font-family: 'Fredoka', 'Outfit', system-ui, sans-serif;
-    background-color: #f8fafc;
+    font-family: 'Nunito', 'Quicksand', 'Fredoka', system-ui, sans-serif;
     color: #1e293b;
+    background-color: #f6faf7;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Nunito', 'Quicksand', sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -14,39 +19,62 @@
   font-family: 'Patrick Hand', cursive, sans-serif;
 }
 
-.font-outfit {
-  font-family: 'Outfit', sans-serif;
-}
-
 .font-fredoka {
   font-family: 'Fredoka', sans-serif;
 }
 
+.font-quicksand {
+  font-family: 'Quicksand', sans-serif;
+}
+
+.font-nunito {
+  font-family: 'Nunito', sans-serif;
+}
+
+/* Living Planet Nature Background (Option C: Soft mint/sky/sage gradient + subtle SVG nature motifs) */
+.bg-living-planet {
+  background-color: #f7fbf8;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(209, 250, 229, 0.45) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(224, 242, 254, 0.45) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(236, 253, 245, 0.5) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(254, 243, 199, 0.3) 0px, transparent 50%),
+    url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23059669' fill-opacity='0.04' fill-rule='evenodd'%3E%3Cpath d='M20 20c5 0 8 5 8 10 0 5-3 10-8 10s-8-5-8-10c0-5 3-10 8-10zm0 3c-3 0-5 3-5 7s2 7 5 7 5-3 5-7-2-7-5-7z'/%3E%3Cpath d='M85 25c4-6 12-6 16 0 2 3 1 7-2 9l-6 4-6-4c-3-2-4-6-2-9z'/%3E%3Cpath d='M30 85c0-4 4-8 8-8s8 4 8 8-4 8-8 8-8-4-8-8zm2 0c0 3 3 6 6 6s6-3 6-6-3-6-6-6-6 3-6 6z'/%3E%3Ccircle cx='95' cy='85' r='5'/%3E%3Cpath d='M60 55c2-3 6-3 8 0 1 2 0 4-1 5l-3 2-3-2c-1-1-2-3-1-5z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
 /* Custom Child-friendly 3D buttons & cards */
 .btn-pop {
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .btn-pop:hover {
-  transform: translateY(-2px) scale(1.02);
+  transform: translateY(-2px);
+  filter: brightness(1.03);
 }
 .btn-pop:active {
   transform: translateY(1px) scale(0.98);
 }
 
+/* Glassmorphism Card for contrast */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(226, 232, 240, 0.85);
+}
+
 /* Book page shadow and depth effect */
 .book-shadow {
   box-shadow: 
-    0 10px 30px -5px rgba(0, 0, 0, 0.2),
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    inset 0 0 15px rgba(0, 0, 0, 0.05);
+    0 12px 36px -6px rgba(0, 0, 0, 0.22),
+    0 24px 30px -8px rgba(0, 0, 0, 0.12),
+    inset 0 0 20px rgba(0, 0, 0, 0.04);
 }
 
 .page-spine {
-  background: linear-gradient(to right, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 5%, rgba(0,0,0,0) 10%);
+  background: linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.06) 5%, rgba(0,0,0,0) 12%);
 }
 
 .page-spine-right {
-  background: linear-gradient(to left, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 5%, rgba(0,0,0,0) 10%);
+  background: linear-gradient(to left, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.06) 5%, rgba(0,0,0,0) 12%);
 }
 
 /* Custom scrollbars */
@@ -66,21 +94,21 @@
   background: #94a3b8;
 }
 
-/* Sparkle & Float animations */
-@keyframes floatSlow {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(2deg); }
+/* Sparkle & Float animations (Subtle & gentle, never distracting) */
+@keyframes floatSubtle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
 }
 
 @keyframes pulseGlow {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
 }
 
 .animate-float {
-  animation: floatSlow 4s ease-in-out infinite;
+  animation: floatSubtle 4s ease-in-out infinite;
 }
 
 .animate-pulse-glow {
-  animation: pulseGlow 2s ease-in-out infinite;
+  animation: pulseGlow 2.5s ease-in-out infinite;
 }
