@@ -5,6 +5,7 @@ import { toggleSound, playClickSound } from '../../audio/soundFx.js';
 
 export function RoleSwitcher({
   currentRole,
+  demoPreview = false,
   onSwitchUser,
   childProfile,
   teacherData,
@@ -44,6 +45,7 @@ export function RoleSwitcher({
 
         {/* Middle Role Switcher Bar */}
         <div className="flex items-center gap-2">
+          {demoPreview && <span className="rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase text-amber-950">Demo Preview</span>}
           {/* Quick Active Role Pill */}
           {currentRole === 'child' && (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold bg-emerald-100 text-emerald-900 border-emerald-300 shadow-xs">
@@ -72,10 +74,10 @@ export function RoleSwitcher({
           <button
             onClick={() => { playClickSound(); onSwitchUser(); }}
             className="btn-pop bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-sm"
-            title="Log out of SDG Quest"
+            title={demoPreview ? "Switch demo role" : "Log out of SDG Quest"}
           >
             <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden md:inline">Log Out</span>
+            <span className="hidden md:inline">{demoPreview ? 'Switch Demo' : 'Log Out'}</span>
             <span className="md:hidden">Exit</span>
           </button>
         </div>

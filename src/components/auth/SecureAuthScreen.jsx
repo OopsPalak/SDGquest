@@ -37,7 +37,7 @@ const colorClasses = {
   purple: 'from-purple-50 to-pink-50 border-purple-200 hover:border-purple-400 text-purple-700'
 };
 
-export function SecureAuthScreen({ onLoginSuccess, passwordRecovery = false, onPasswordUpdated }) {
+export function SecureAuthScreen({ onLoginSuccess, onDemoPreview, onOpenDemo, passwordRecovery = false, onPasswordUpdated }) {
   const [role, setRole] = useState(null);
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
@@ -210,6 +210,28 @@ export function SecureAuthScreen({ onLoginSuccess, passwordRecovery = false, onP
                   </div>
                 </button>
               ))}
+            </div>
+            <div className="border-t border-slate-200 pt-4 text-center">
+              <p className="text-xs font-bold text-slate-500">Preview only. Demo changes are not saved.</p>
+              <div className="mt-2 flex flex-wrap justify-center gap-2">
+                {roles.map((item) => (
+                  <button
+                    key={`demo-${item.id}`}
+                    type="button"
+                    onClick={() => onDemoPreview?.(item.id)}
+                    className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"
+                  >
+                    Preview {item.id[0].toUpperCase() + item.id.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={onOpenDemo}
+                className="mt-3 text-xs font-black text-emerald-800 underline underline-offset-2"
+              >
+                Open the original demo login and registration screens
+              </button>
             </div>
           </div>
         ) : (

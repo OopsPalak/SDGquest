@@ -6,6 +6,7 @@ import { playBadgeUnlockSound, playLevelUpSound, playClickSound, playSuccessSoun
 
 // Auth & Entry Components
 import { SecureAuthScreen as AuthScreen } from './components/auth/SecureAuthScreen.jsx';
+import { AuthScreen as DemoAuthScreen } from './components/auth/AuthScreen.jsx';
 
 // Common Components
 import { RoleSwitcher } from './components/common/RoleSwitcher.jsx';
@@ -32,7 +33,7 @@ import { apiJson, apiRequest } from './lib/api.js';
 import { supabase } from './lib/supabase.js';
 
 // Constants & Lessons Data
-import { INITIAL_MISSIONS, SDGS_DATA } from './utils/constants.js';
+import { INITIAL_BOOK_PAGES, INITIAL_MISSIONS, SDGS_DATA } from './utils/constants.js';
 
 // Helper to compute level from XP dynamically
 function computeLevel(xp) {
@@ -63,6 +64,8 @@ const DEFAULT_CHILD_PROFILE = {
 export default function App() {
   // Authentication & Role State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isDemoPreview, setIsDemoPreview] = useState(false);
+  const [showLegacyDemo, setShowLegacyDemo] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [role, setRole] = useState('child'); // 'child' | 'teacher' | 'parent'
@@ -112,6 +115,7 @@ export default function App() {
 
   const applyProfile = async (profile) => {
     const selectedRole = profile.role === 'student' ? 'child' : profile.role;
+    setIsDemoPreview(false);
     setRole(selectedRole);
     setIsLoggedIn(true);
     setActiveTab('home');
@@ -242,6 +246,8 @@ export default function App() {
 
   const clearPrivateState = () => {
     setIsLoggedIn(false);
+    setIsDemoPreview(false);
+    setShowLegacyDemo(false);
     setRole('child');
     setActiveTab('home');
     setChildProfile({ ...DEFAULT_CHILD_PROFILE, avatar: { ...DEFAULT_CHILD_PROFILE.avatar } });
@@ -265,6 +271,92 @@ export default function App() {
     setActiveQuizLesson(null);
     setCelebrationData(null);
     setAppMessage('');
+  };
+
+  const handleDemoPreview = (demoRole) => {
+    const previewRole = demoRole === 'student' ? 'child' : demoRole;
+    const previewChild = {
+      ...DEFAULT_CHILD_PROFILE,
+      name: 'Aarav',
+      xp: 210,
+      level: 2,
+      levelName: 'Earth Friend',
+      streak: 4,
+      unlockedBadges: ['water_saver', 'nature_protector', 'waste_warrior'],
+      pagesCount: INITIAL_BOOK_PAGES.length,
+      avatar: { ...DEFAULT_CHILD_PROFILE.avatar, style: 'Short Curly', outfit: 'Water Guardian Hoodie' }
+    };
+    setIsDemoPreview(true);
+    setIsLoggedIn(true);
+    setRole(previewRole);
+    setActiveTab('home');
+    setAppMessage('Demo preview only. Changes are not saved and do not affect real accounts.');
+    setChildProfile(previewChild);
+    setMissions(INITIAL_MISSIONS);
+    setSdgs(SDGS_DATA);
+    setBookPages(INITIAL_BOOK_PAGES.map((page) => ({ ...page, author: previewChild.name })));
+    setCompletedQuizzes({});
+    setParentBookOpen(false);
+
+    if (previewRole === 'teacher') {
+      setTeacherData({
+        name: 'Ms. Clara Vance',
+        className: 'Class 5A',
+        classes: [{ id: 'demo-class', name: 'Class 5A', invite_code: 'PREVIEW-CLASS' }],
+        totalStudents: 5,
+        completionRate: 84,
+        students: [
+          { id: 'demo-student-1', name: 'Aarav', grade: 'Grade 4', level: 2, xp: 210, avatarIcon: '👦', bookPages: 3, badges: ['water_saver'] },
+          { id: 'demo-student-2', name: 'Maya', grade: 'Grade 4', level: 2, xp: 180, avatarIcon: '👧', bookPages: 2, badges: ['nature_protector'] }
+        ]
+      });
+      setSubmissions([{
+        id: 'demo-submission-1',
+        missionId: 'm_water_1',
+        childName: 'Aarav',
+        status: 'pending',
+        caption: 'I turned off the tap while brushing for three days.',
+        mediaUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b7?auto=format&fit=crop&w=600&q=80'
+      }]);
+    } else if (previewRole === 'parent') {
+      const demoChild = { id: 'demo-child', name: previewChild.name, grade: 'Grade 4', xp: previewChild.xp, level: previewChild.level };
+      setParentChildren([demoChild]);
+      setSelectedParentChild(demoChild);
+      setParentDigest({ parentName: 'David Sharma', childName: previewChild.name });
+      setSubmissions([{ id: 'demo-approved-1', status: 'approved', mission_id: 'm_water_1', xp_awarded: 50 }]);
+      setFamilyMissions([{ id: 'demo-family-1', title: 'Rainwater Garden Collector', description: 'Collect rainwater for plants.', status: 'available' }]);
+    } else {
+      setParentChildren([]);
+      setSelectedParentChild(null);
+      setStudentInviteCode('DEMO-PARENT-CODE');
+      setSubmissions([]);
+    }
+  };
+
+  const handleLegacyDemoLogin = (demoRole, profileData, isSampleData = false) => {
+    handleDemoPreview(demoRole === 'child' ? 'student' : demoRole);
+    if (demoRole === 'child') {
+      setChildProfile((current) => ({
+        ...current,
+        ...profileData,
+        id: undefined,
+        avatar: { ...DEFAULT_CHILD_PROFILE.avatar, ...(profileData.avatar || {}) }
+      }));
+      setBookPages(isSampleData ? INITIAL_BOOK_PAGES.map((page) => ({ ...page, author: profileData.name })) : []);
+    } else if (demoRole === 'teacher') {
+      setTeacherData((current) => ({
+        ...current,
+        ...profileData,
+        classes: current.classes,
+        students: current.students
+      }));
+    } else if (demoRole === 'parent') {
+      const childName = profileData.childName || 'Aarav';
+      setParentDigest({ parentName: profileData.name || 'David Sharma', childName });
+      setChildProfile((current) => ({ ...current, name: childName, id: 'demo-child' }));
+      setSelectedParentChild({ id: 'demo-child', name: childName, grade: 'Grade 4' });
+      setBookPages(INITIAL_BOOK_PAGES.map((page) => ({ ...page, author: childName })));
+    }
   };
 
   useEffect(() => {
@@ -321,7 +413,12 @@ export default function App() {
 
   const handleSwitchUser = async () => {
     playClickSound();
-    if (supabase) {
+    if (isDemoPreview) {
+      clearPrivateState();
+      setShowLegacyDemo(true);
+      return;
+    }
+    if (supabase && !isDemoPreview) {
       try {
         await apiRequest('/api/auth/logout', { method: 'POST' });
       } catch {}
@@ -349,6 +446,18 @@ export default function App() {
 
   // Handler when quiz is completed
   const handleQuizComplete = async (quizId, answers) => {
+    if (isDemoPreview) {
+      const questions = activeQuizLesson?.quiz?.questions || [];
+      const score = questions.filter((question) => Number(answers[question.id]) === question.correctIndex).length;
+      const total = questions.length;
+      const xpAwarded = (activeQuizLesson?.quiz?.xpReward || 20) + (score === total ? (activeQuizLesson?.quiz?.bonusXp || 10) : 0);
+      const updatedXp = childProfile.xp + xpAwarded;
+      const levelInfo = computeLevel(updatedXp);
+      const result = { score, total, xp_awarded: xpAwarded, total_xp: updatedXp };
+      setChildProfile((current) => ({ ...current, xp: updatedXp, ...levelInfo }));
+      setCompletedQuizzes((current) => ({ ...current, [quizId]: { score: result.score, totalQ: result.total, completedAt: new Date().toISOString() } }));
+      return result;
+    }
     const result = await apiJson('/api/student/quiz-attempts', {
       method: 'POST',
       body: JSON.stringify({ quizId, answers })
@@ -369,6 +478,41 @@ export default function App() {
 
   // Handler when evidence is submitted
   const handleSubmitComplete = async (payload) => {
+    if (isDemoPreview) {
+      const mission = selectedMission || missions.find((item) => item.id === payload.missionId) || INITIAL_MISSIONS[0];
+      const xpEarned = mission.xpReward || 50;
+      const nextXp = childProfile.xp + xpEarned;
+      const levelInfo = computeLevel(nextXp);
+      const badgeId = mission.badgeId || 'water_saver';
+      const nextBadges = [...new Set([...childProfile.unlockedBadges, badgeId])];
+      const mediaUrl = payload.file
+        ? URL.createObjectURL(payload.file)
+        : payload.mediaDataUrl || undefined;
+      const page = {
+        id: `demo-page-${Date.now()}`,
+        sdgId: mission.sdgId || mission.sdg_number || 6,
+        sdgNumber: mission.sdgNumber || mission.sdg_number || 6,
+        title: mission.title,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        caption: payload.caption,
+        mediaUrl,
+        type: payload.type || 'photo',
+        frame: payload.frame || 'water',
+        stickers: payload.stickers || [],
+        xpEarned,
+        badgeName: mission.badgeName || mission.badge_name || 'SDG Achiever',
+        badgeIcon: mission.badgeIcon || mission.badge_icon || '⭐',
+        author: childProfile.name
+      };
+      setChildProfile((current) => ({ ...current, xp: nextXp, ...levelInfo, unlockedBadges: nextBadges }));
+      setBookPages((current) => [...current, page]);
+      setAppMessage('Demo preview only. The sample mission reward and book page were not saved to an account.');
+      setIsSubmittingMission(null);
+      setSelectedMission(null);
+      setActiveTab('home');
+      triggerCelebration({ xpEarned, badgeName: page.badgeName, badgeIcon: page.badgeIcon, missionTitle: mission.title });
+      return;
+    }
     const form = new FormData();
     form.set('missionId', payload.missionId);
     form.set('caption', payload.caption || '');
@@ -418,6 +562,21 @@ export default function App() {
 
   // Teacher verification handler
   const handleVerifySubmission = async (subId, status, comment) => {
+    if (isDemoPreview) {
+      const submission = submissions.find((item) => item.id === subId);
+      setSubmissions((current) => current.map((item) => item.id === subId ? { ...item, status, teacherComment: comment } : item));
+      if (status === 'approved' && submission) {
+        const mission = missions.find((item) => item.id === submission.missionId) || INITIAL_MISSIONS[0];
+        setTeacherData((current) => ({
+          ...current,
+          students: current.students.map((student, index) => index === 0
+            ? { ...student, xp: student.xp + (mission.xpReward || 50), bookPages: student.bookPages + 1, badges: [...new Set([...(student.badges || []), mission.badgeId || 'water_saver'])] }
+            : student)
+        }));
+      }
+      setAppMessage('Demo preview only. The sample review was not saved and no real reward was issued.');
+      return;
+    }
     try {
       await apiJson(`/api/submissions/${subId}/review`, {
       method: 'POST',
@@ -432,6 +591,11 @@ export default function App() {
 
   // Teacher custom mission creator
   const handleCreateMission = async (newMission) => {
+    if (isDemoPreview) {
+      setMissions((current) => [...current, { ...newMission, id: `demo-mission-${current.length + 1}`, status: 'available' }]);
+      setAppMessage('Preview only. The mission was not saved.');
+      return;
+    }
     try {
       const saved = await apiJson('/api/missions', {
       method: 'POST',
@@ -452,6 +616,10 @@ export default function App() {
 
   // Summer day complete handler
   const handleCompleteSummerDay = async (dayNum) => {
+    if (isDemoPreview) {
+      setSummerData((current) => ({ ...current, completedDays: [...new Set([...current.completedDays, dayNum])] }));
+      return;
+    }
     try {
       const updated = await apiJson(`/api/student/summer/${dayNum}/complete`, { method: 'POST' });
       setSummerData(updated);
@@ -461,6 +629,10 @@ export default function App() {
   };
 
   const handleCreateFamilyMission = async (mission) => {
+    if (isDemoPreview) {
+      setFamilyMissions((current) => [{ ...mission, id: `demo-family-${current.length + 1}`, status: 'available' }, ...current]);
+      return;
+    }
     if (!selectedParentChild) return;
     try {
       const saved = await apiJson(`/api/parent/children/${selectedParentChild.id}/family-missions`, {
@@ -474,6 +646,10 @@ export default function App() {
   };
 
   const handleCompleteFamilyMission = async (missionId) => {
+    if (isDemoPreview) {
+      setFamilyMissions((current) => current.map((mission) => mission.id === missionId ? { ...mission, status: 'completed' } : mission));
+      return;
+    }
     try {
       const saved = await apiJson(`/api/parent/family-missions/${missionId}/complete`, { method: 'POST' });
       setFamilyMissions((current) => current.map((mission) => mission.id === missionId ? saved : mission));
@@ -487,8 +663,21 @@ export default function App() {
     return <div className="min-h-screen bg-living-planet flex items-center justify-center text-slate-700 font-bold">Checking secure session...</div>;
   }
   if (!isLoggedIn) {
+    if (showLegacyDemo) {
+      return (
+        <>
+          <div className="sticky top-0 z-50 flex items-center justify-center gap-3 bg-amber-100 px-3 py-2 text-center text-xs font-black text-amber-950">
+            <span>DEMO ONLY. No account, upload, or rewards are saved.</span>
+            <button type="button" onClick={() => setShowLegacyDemo(false)} className="underline underline-offset-2">Back to secure login</button>
+          </div>
+          <DemoAuthScreen onLoginSuccess={handleLegacyDemoLogin} />
+        </>
+      );
+    }
     return <AuthScreen
       onLoginSuccess={handleLoginSuccess}
+      onDemoPreview={handleDemoPreview}
+      onOpenDemo={() => setShowLegacyDemo(true)}
       passwordRecovery={passwordRecovery}
       onPasswordUpdated={() => {
         setPasswordRecovery(false);
@@ -502,6 +691,7 @@ export default function App() {
       {/* Top Header Role Switcher Bar */}
       <RoleSwitcher
         currentRole={role}
+        demoPreview={isDemoPreview}
         onSwitchUser={handleSwitchUser}
         childProfile={childProfile}
         teacherData={teacherData}
@@ -559,7 +749,9 @@ export default function App() {
                 onSaveAvatar={(av) => {
                   const updatedProfile = { ...childProfile, avatar: av };
                   setChildProfile(updatedProfile);
-                  apiJson('/api/profile', { method: 'PATCH', body: JSON.stringify({ avatar: av }) }).catch((error) => setAppMessage(error.message));
+                  if (!isDemoPreview) {
+                    apiJson('/api/profile', { method: 'PATCH', body: JSON.stringify({ avatar: av }) }).catch((error) => setAppMessage(error.message));
+                  }
                 }}
               />
             )}
