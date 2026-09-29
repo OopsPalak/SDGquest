@@ -14,6 +14,9 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [earnedXp, setEarnedXp] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const currentQ = questions[currentIdx];
   const totalQ = questions.length;
@@ -22,6 +25,7 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
     if (isAnswered) return;
     setSelectedOption(index);
     setIsAnswered(true);
+    setSelectedAnswers((previous) => ({ ...previous, [currentQ.id]: index }));
 
     const isCorrect = index === currentQ.correctIndex;
     if (isCorrect) {
@@ -32,7 +36,7 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     playClickSound();
     if (currentIdx < totalQ - 1) {
       setCurrentIdx(prev => prev + 1);
@@ -40,25 +44,22 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
       setIsAnswered(false);
     } else {
       // Quiz complete!
-      const finalScore = score + (selectedOption === currentQ.correctIndex ? 0 : 0); // score already updated
-      const isPerfect = finalScore === totalQ;
-      const totalXp = (quiz.xpReward || 20) + (isPerfect ? (quiz.bonusXp || 10) : 0);
-      
-      setEarnedXp(totalXp);
-      setIsFinished(true);
-      playLevelUpSound();
-
+      setIsSubmitting(true);
+      setSubmitError('');
       try {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch (e) {}
-
-      // Inform parent of completion
-      if (onComplete) {
-        onComplete(lesson.sdgId, finalScore, totalQ, totalXp);
+        const answers = Object.fromEntries(Object.entries(selectedAnswers).map(([questionId, answer]) => [questionId, String(answer)]));
+        const result = await onComplete(quiz.id, answers);
+        setScore(result.score);
+        setEarnedXp(result.xp_awarded || 0);
+        setIsFinished(true);
+        playLevelUpSound();
+        try {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        } catch {}
+      } catch (error) {
+        setSubmitError(error.message || 'Your quiz could not be saved. Try again.');
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -70,6 +71,8 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
     setIsAnswered(false);
     setScore(0);
     setIsFinished(false);
+    setSelectedAnswers({});
+    setSubmitError('');
   };
 
   return (
@@ -175,6 +178,8 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
               })}
             </div>
 
+            {submitError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800">{submitError}</p>}
+
             {/* Feedback Message */}
             {isAnswered && (
               <div className={`p-4 rounded-2xl text-xs font-bold space-y-1 animate-float ${
@@ -204,9 +209,10 @@ export function QuizModal({ lesson, onClose, onComplete, onStartMission }) {
               <div className="pt-2">
                 <button
                   onClick={handleNext}
-                  className="btn-pop w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-2xl shadow-lg flex items-center justify-center gap-2 text-sm border-2 border-emerald-300"
+                  disabled={isSubmitting}
+                  className="btn-pop w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3.5 rounded-2xl shadow-lg flex items-center justify-center gap-2 text-sm border-2 border-emerald-300 disabled:opacity-60"
                 >
-                  <span>{currentIdx < totalQ - 1 ? 'NEXT QUESTION' : 'VIEW SCORE & REWARDS'}</span>
+                  <span>{isSubmitting ? 'SAVING QUIZ...' : currentIdx < totalQ - 1 ? 'NEXT QUESTION' : 'VIEW SCORE & REWARDS'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

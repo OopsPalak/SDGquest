@@ -5,8 +5,8 @@ import { playClickSound, playSuccessSound } from '../../audio/soundFx.js';
 export function SummerAdventure({ summerData, onCompleteDay }) {
   const [activeDay, setActiveDay] = useState(13); // Default day
 
-  const completedDays = summerData?.completedDays || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-  const totalDays = 30;
+  const completedDays = summerData?.completedDays || [];
+  const totalDays = summerData?.totalDays || 30;
 
   const handleMarkComplete = (day) => {
     playSuccessSound();
@@ -36,7 +36,7 @@ export function SummerAdventure({ summerData, onCompleteDay }) {
           </span>
           <h1 className="text-3xl font-black text-white">SDG Summer Adventure</h1>
           <p className="text-xs text-amber-100 font-medium max-w-md">
-            Complete 30 daily micro-missions across 17 SDGs to earn the Master Young Change Maker Trophy!
+            Complete daily micro-missions across 17 SDGs and track your summer progress!
           </p>
 
           <div className="pt-2 flex items-center gap-3">
@@ -98,9 +98,7 @@ export function SummerAdventure({ summerData, onCompleteDay }) {
                 <span>COMPLETED 🎉</span>
               </span>
             ) : (
-              <span className="bg-amber-200 text-amber-900 font-bold text-xs px-2.5 py-1 rounded-full">
-                +20 XP ⭐
-              </span>
+              <span className="bg-amber-200 text-amber-900 font-bold text-xs px-2.5 py-1 rounded-full">Ready to complete</span>
             )}
           </div>
 
@@ -114,7 +112,7 @@ export function SummerAdventure({ summerData, onCompleteDay }) {
               className="btn-pop bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-3 rounded-2xl shadow-md flex items-center gap-2 text-sm"
             >
               <CheckCircle2 className="w-5 h-5" />
-              <span>MARK DAY {activeDay} COMPLETE (+20 XP)</span>
+              <span>MARK DAY {activeDay} COMPLETE</span>
             </button>
           )}
         </div>

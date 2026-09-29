@@ -5,7 +5,6 @@ import { toggleSound, playClickSound } from '../../audio/soundFx.js';
 
 export function RoleSwitcher({
   currentRole,
-  onRoleChange,
   onSwitchUser,
   childProfile,
   teacherData,
@@ -23,10 +22,7 @@ export function RoleSwitcher({
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 py-2.5 shadow-sm">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
         {/* App Logo & Title */}
-        <div 
-          onClick={() => { onRoleChange('child'); playClickSound(); }}
-          className="flex items-center gap-2.5 cursor-pointer group"
-        >
+        <div className="flex items-center gap-2.5 group">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-cyan-400 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform overflow-hidden p-1.5">
             <svg viewBox="0 0 40 40" className="w-full h-full drop-shadow">
               <circle cx="20" cy="20" r="18" fill="#0284c7" />
@@ -76,11 +72,11 @@ export function RoleSwitcher({
           <button
             onClick={() => { playClickSound(); onSwitchUser(); }}
             className="btn-pop bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-full border border-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-sm"
-            title="Switch User Role or Log In"
+            title="Log out of SDG Quest"
           >
             <ArrowRightLeft className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden md:inline">Switch Role</span>
-            <span className="md:hidden">Roles</span>
+            <span className="hidden md:inline">Log Out</span>
+            <span className="md:hidden">Exit</span>
           </button>
         </div>
 

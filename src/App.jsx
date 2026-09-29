@@ -5,7 +5,7 @@ import confetti from 'canvas-confetti';
 import { playBadgeUnlockSound, playLevelUpSound, playClickSound, playSuccessSound } from './audio/soundFx.js';
 
 // Auth & Entry Components
-import { AuthScreen } from './components/auth/AuthScreen.jsx';
+import { SecureAuthScreen as AuthScreen } from './components/auth/SecureAuthScreen.jsx';
 
 // Common Components
 import { RoleSwitcher } from './components/common/RoleSwitcher.jsx';
@@ -28,10 +28,11 @@ import { SummerAdventure } from './components/child/SummerAdventure.jsx';
 import { TeacherDashboard } from './components/teacher/TeacherDashboard.jsx';
 import { CertificateGen } from './components/teacher/CertificateGen.jsx';
 import { ParentDashboard } from './components/parent/ParentDashboard.jsx';
+import { apiJson, apiRequest } from './lib/api.js';
+import { supabase } from './lib/supabase.js';
 
 // Constants & Lessons Data
-import { INITIAL_MISSIONS, INITIAL_BOOK_PAGES, SDGS_DATA, LEVELS } from './utils/constants.js';
-import { LESSONS_DATA } from './utils/lessonsData.js';
+import { INITIAL_MISSIONS, SDGS_DATA } from './utils/constants.js';
 
 // Helper to compute level from XP dynamically
 function computeLevel(xp) {
@@ -42,44 +43,59 @@ function computeLevel(xp) {
   return { level: 1, levelName: 'SDG Explorer' };
 }
 
+const DEFAULT_CHILD_PROFILE = {
+  name: 'Explorer',
+  xp: 0,
+  level: 1,
+  levelName: 'SDG Explorer',
+  streak: 0,
+  unlockedBadges: [],
+  pagesCount: 0,
+  avatar: {
+    skin: '#FFD1A4',
+    hair: '#8D5B4C',
+    style: 'Adventure Cap',
+    outfit: 'Eco Adventurer Tee',
+    accessory: 'Eco Backpack 🎒'
+  }
+};
+
 export default function App() {
   // Authentication & Role State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [role, setRole] = useState('child'); // 'child' | 'teacher' | 'parent'
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'learn' | 'missions' | 'book' | 'badges' | 'profile' | 'summer'
   const [soundOn, setSoundOn] = useState(true);
 
   // Student Profile State (Starts clean for new users)
-  const [childProfile, setChildProfile] = useState({
-    name: 'Explorer',
-    xp: 0,
-    level: 1,
-    levelName: 'SDG Explorer',
-    streak: 1,
-    unlockedBadges: [],
-    pagesCount: 0,
-    avatar: {
-      skin: '#FFD1A4',
-      hair: '#8D5B4C',
-      style: 'Adventure Cap',
-      outfit: 'Eco Adventurer Tee',
-      accessory: 'Eco Backpack 🎒'
-    }
-  });
+  const [childProfile, setChildProfile] = useState(() => ({
+    ...DEFAULT_CHILD_PROFILE,
+    avatar: { ...DEFAULT_CHILD_PROFILE.avatar }
+  }));
 
   const [sdgs, setSdgs] = useState(SDGS_DATA);
   const [missions, setMissions] = useState(INITIAL_MISSIONS);
   const [submissions, setSubmissions] = useState([]);
   const [bookPages, setBookPages] = useState([]);
   const [completedQuizzes, setCompletedQuizzes] = useState({});
+  const [parentChildren, setParentChildren] = useState([]);
+  const [selectedParentChild, setSelectedParentChild] = useState(null);
+  const [familyMissions, setFamilyMissions] = useState([]);
+  const [parentBookOpen, setParentBookOpen] = useState(false);
+  const [studentInviteCode, setStudentInviteCode] = useState('');
+  const [appMessage, setAppMessage] = useState('');
   const [teacherData, setTeacherData] = useState({
-    name: 'Ms. Clara Vance',
-    className: 'Class 5A',
-    totalStudents: 32,
-    completionRate: 84
+    name: '',
+    className: 'No class yet',
+    classes: [],
+    students: [],
+    totalStudents: 0,
+    completionRate: 0
   });
   const [parentDigest, setParentDigest] = useState({
-    parentName: 'Sarah & David',
+    parentName: '',
     childName: 'Explorer'
   });
   const [summerData, setSummerData] = useState({ currentDay: 1, totalDays: 30, completedDays: [] });
@@ -94,95 +110,224 @@ export default function App() {
   // Victory Celebration Modal State
   const [celebrationData, setCelebrationData] = useState(null);
 
-  // Load initial backend data or localStorage session if available
-  useEffect(() => {
-    const savedSession = localStorage.getItem('sdg_user_session');
-    if (savedSession) {
-      try {
-        const parsed = JSON.parse(savedSession);
-        setIsLoggedIn(true);
-        setRole(parsed.role || 'child');
-        if (parsed.profile) setChildProfile(parsed.profile);
-        if (parsed.bookPages) setBookPages(parsed.bookPages);
-        if (parsed.completedQuizzes) setCompletedQuizzes(parsed.completedQuizzes);
-      } catch (e) {}
-    }
-
-    // Try fetching from backend API (optional fallback)
-    fetch('/api/missions')
-      .then(res => res.json())
-      .then(data => setMissions(data))
-      .catch(() => {});
-
-    fetch('/api/submissions')
-      .then(res => res.json())
-      .then(data => setSubmissions(data))
-      .catch(() => {});
-
-    fetch('/api/teacher')
-      .then(res => res.json())
-      .then(data => setTeacherData(data))
-      .catch(() => {});
-
-    fetch('/api/parent')
-      .then(res => res.json())
-      .then(data => setParentDigest(data))
-      .catch(() => {});
-  }, []);
-
-  // Save session state to localStorage
-  const saveSession = (newRole, newProfile, newPages, newQuizzes) => {
-    try {
-      localStorage.setItem('sdg_user_session', JSON.stringify({
-        role: newRole || role,
-        profile: newProfile || childProfile,
-        bookPages: newPages || bookPages,
-        completedQuizzes: newQuizzes || completedQuizzes
-      }));
-    } catch (e) {}
-  };
-
-  // Auth Handler: called from AuthScreen
-  const handleLoginSuccess = (selectedRole, profileData, isSampleData = false) => {
+  const applyProfile = async (profile) => {
+    const selectedRole = profile.role === 'student' ? 'child' : profile.role;
     setRole(selectedRole);
     setIsLoggedIn(true);
     setActiveTab('home');
+    setAppMessage('');
 
     if (selectedRole === 'child') {
-      const studentProfile = {
-        name: profileData.name || 'Explorer',
-        xp: profileData.xp || 0,
-        level: profileData.level || 1,
-        levelName: profileData.levelName || 'SDG Explorer',
-        streak: profileData.streak || 1,
-        unlockedBadges: profileData.unlockedBadges || [],
-        pagesCount: isSampleData ? 3 : (profileData.pagesCount || 0),
-        avatar: profileData.avatar || {
-          skin: '#FFD1A4',
-          hair: '#8D5B4C',
-          style: 'Adventure Hat',
-          outfit: 'Eco Adventurer Tee',
-          accessory: 'Eco Backpack 🎒'
-        }
-      };
-
-      const startingPages = isSampleData ? INITIAL_BOOK_PAGES : [];
-      setChildProfile(studentProfile);
-      setBookPages(startingPages);
-      saveSession('child', studentProfile, startingPages, {});
+      setSdgs(SDGS_DATA.map((sdg) => ({ ...sdg, completedMissions: 0 })));
+      setChildProfile((current) => ({
+        ...current,
+        name: profile.name,
+        xp: profile.xp || 0,
+        level: profile.level || 1,
+        levelName: computeLevel(profile.xp || 0).levelName,
+        streak: profile.streak || 0,
+        grade: profile.grade,
+        id: profile.id,
+        avatar: { ...DEFAULT_CHILD_PROFILE.avatar, ...(profile.avatar || {}) }
+      }));
+      const [progress, pages, invite, missionRows, summer] = await Promise.all([
+        apiJson('/api/student/progress'),
+        apiJson('/api/student/book-pages'),
+        apiJson('/api/profile/invite-code'),
+        apiJson('/api/missions'),
+        apiJson('/api/student/summer')
+      ]);
+      setChildProfile((current) => ({
+        ...current,
+        xp: progress.profile.xp,
+        level: progress.profile.level,
+        levelName: computeLevel(progress.profile.xp).levelName,
+        streak: progress.profile.streak,
+        unlockedBadges: progress.badges.map((badge) => badge.badge_id),
+        pagesCount: pages.length,
+        quizAttempts: progress.quizAttempts,
+        sdgProgress: progress.sdgs,
+        planetProgress: progress.planet
+      }));
+      const sdgProgress = new Map(progress.sdgs.map((item) => [item.sdg_number, item.progress]));
+      setSdgs(SDGS_DATA.map((sdg) => ({
+        ...sdg,
+        completedMissions: Math.min(sdg.totalMissions, Math.round((sdgProgress.get(sdg.number) || 0) / 10))
+      })));
+      setBookPages(pages.map((page) => ({
+        ...page,
+        sdgId: page.sdg_number,
+        sdgNumber: page.sdg_number,
+        frame: page.frame_id,
+        xpEarned: page.xp_earned,
+        badgeName: page.badge_name,
+        badgeIcon: page.badge_icon,
+        stickers: page.stickers,
+        author: profile.name,
+        date: new Date(page.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      })));
+      setStudentInviteCode(invite.inviteCode);
+      setSummerData(summer);
+      setCompletedQuizzes(Object.fromEntries(progress.quizAttempts.map((attempt) => [attempt.quiz_id, {
+        score: attempt.score,
+        totalQ: attempt.total,
+        completedAt: attempt.created_at
+      }])));
+      setMissions(missionRows.map((mission) => ({
+        ...mission,
+        sdgId: mission.sdg_number,
+        sdgNumber: mission.sdg_number,
+        challengeText: mission.description,
+        bonusText: '',
+        xpReward: mission.xp_reward,
+        badgeId: mission.badge_id,
+        badgeName: mission.badge_name,
+        badgeIcon: mission.badge_icon || '⭐',
+        status: 'available'
+      })));
     } else if (selectedRole === 'teacher') {
-      setTeacherData(prev => ({ ...prev, ...profileData }));
-      saveSession('teacher', childProfile, bookPages, completedQuizzes);
-    } else if (selectedRole === 'parent') {
-      setParentDigest(prev => ({ ...prev, ...profileData }));
-      saveSession('parent', childProfile, bookPages, completedQuizzes);
+      const [dashboard, missionRows, pending] = await Promise.all([
+        apiJson('/api/teacher'),
+        apiJson('/api/missions'),
+        apiJson('/api/submissions')
+      ]);
+      setTeacherData(dashboard);
+      setMissions(missionRows);
+      setSubmissions(pending);
+    } else {
+      setParentDigest((current) => ({ ...current, parentName: profile.name }));
+      const [dashboard, missionRows] = await Promise.all([
+        apiJson('/api/parent'),
+        apiJson('/api/missions')
+      ]);
+      setParentChildren(dashboard.children);
+      setMissions(missionRows);
+      if (dashboard.children.length) {
+        await loadParentChild(dashboard.children[0]);
+      }
     }
   };
 
-  // Switch User / Logout: Returns to AuthScreen
-  const handleSwitchUser = () => {
-    playClickSound();
+  const loadParentChild = async (child) => {
+    const [progress, pages, submissions, family] = await Promise.all([
+      apiJson(`/api/parent/children/${child.id}/progress`),
+      apiJson(`/api/parent/children/${child.id}/book-pages`),
+      apiJson(`/api/parent/children/${child.id}/submissions`),
+      apiJson(`/api/parent/children/${child.id}/family-missions`)
+    ]);
+    setSelectedParentChild(child);
+    setChildProfile((current) => ({
+      ...current,
+      id: progress.profile.id,
+      name: progress.profile.name,
+      xp: progress.profile.xp,
+      level: progress.profile.level,
+      levelName: computeLevel(progress.profile.xp).levelName,
+      streak: progress.profile.streak,
+      unlockedBadges: progress.badges.map((badge) => badge.badge_id),
+      pagesCount: pages.length,
+      quizAttempts: progress.quizAttempts,
+      sdgProgress: progress.sdgs,
+      planetProgress: progress.planet,
+      avatar: { ...DEFAULT_CHILD_PROFILE.avatar, ...(progress.profile.avatar || {}) }
+    }));
+    setBookPages(pages.map((page) => ({
+      ...page,
+      date: new Date(page.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    })));
+    setSubmissions(submissions);
+    setFamilyMissions(family);
+    setParentDigest((current) => ({ ...current, childName: progress.profile.name }));
+  };
+
+  const clearPrivateState = () => {
     setIsLoggedIn(false);
+    setRole('child');
+    setActiveTab('home');
+    setChildProfile({ ...DEFAULT_CHILD_PROFILE, avatar: { ...DEFAULT_CHILD_PROFILE.avatar } });
+    setSdgs(SDGS_DATA);
+    setMissions(INITIAL_MISSIONS);
+    setSubmissions([]);
+    setBookPages([]);
+    setCompletedQuizzes({});
+    setParentChildren([]);
+    setSelectedParentChild(null);
+    setFamilyMissions([]);
+    setParentBookOpen(false);
+    setStudentInviteCode('');
+    setTeacherData({ name: '', className: 'No class yet', classes: [], students: [], totalStudents: 0, completionRate: 0 });
+    setParentDigest({ parentName: '', childName: 'Explorer' });
+    setSummerData({ currentDay: 1, totalDays: 30, completedDays: [] });
+    setSelectedSdg(null);
+    setSelectedMission(null);
+    setIsSubmittingMission(null);
+    setShowCertificateGen(false);
+    setActiveQuizLesson(null);
+    setCelebrationData(null);
+    setAppMessage('');
+  };
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthReady(true);
+      return undefined;
+    }
+    let active = true;
+    let handledToken = null;
+    const restoreSession = async (currentSession, eventName) => {
+      if (!active) return;
+      if (eventName === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+        setAuthReady(true);
+        return;
+      }
+      if (!currentSession) {
+        handledToken = null;
+        clearPrivateState();
+        setAuthReady(true);
+        return;
+      }
+      if (currentSession.access_token === handledToken) return;
+      handledToken = currentSession.access_token;
+      try {
+        const profile = await apiJson('/api/auth/me', {}, currentSession);
+        if (active) await applyProfile(profile);
+      } catch {
+        await supabase.auth.signOut();
+        if (active) {
+          clearPrivateState();
+          setAppMessage('Your session has expired. Please sign in again.');
+        }
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((eventName, currentSession) => {
+      window.setTimeout(() => restoreSession(currentSession, eventName), 0);
+    });
+    supabase.auth.getSession().then(({ data }) => restoreSession(data.session));
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLoginSuccess = (selectedRole, profileData) => {
+    applyProfile({ ...profileData, role: selectedRole === 'child' ? 'student' : selectedRole }).catch(() => {
+      setIsLoggedIn(false);
+      setAppMessage('Your account could not be loaded. Please sign in again.');
+    });
+  };
+
+  const handleSwitchUser = async () => {
+    playClickSound();
+    if (supabase) {
+      try {
+        await apiRequest('/api/auth/logout', { method: 'POST' });
+      } catch {}
+      await supabase.auth.signOut();
+    }
+    clearPrivateState();
   };
 
   // Handler to start a mission
@@ -203,89 +348,55 @@ export default function App() {
   };
 
   // Handler when quiz is completed
-  const handleQuizComplete = (sdgId, score, totalQ, xpEarned) => {
-    const newXp = childProfile.xp + xpEarned;
-    const { level, levelName } = computeLevel(newXp);
-    const newQuizzes = { ...completedQuizzes, [sdgId]: { score, totalQ, completedAt: new Date().toISOString() } };
-
-    const updatedProfile = {
-      ...childProfile,
-      xp: newXp,
-      level,
-      levelName
-    };
-
-    setChildProfile(updatedProfile);
-    setCompletedQuizzes(newQuizzes);
-    saveSession(role, updatedProfile, bookPages, newQuizzes);
-
-    // Also notify backend if available
-    fetch('/api/profile', {
+  const handleQuizComplete = async (quizId, answers) => {
+    const result = await apiJson('/api/student/quiz-attempts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ xp: newXp, level, levelName })
-    }).catch(() => {});
+      body: JSON.stringify({ quizId, answers })
+    });
+    const profile = await apiJson('/api/profile');
+    setChildProfile((current) => ({
+      ...current,
+      xp: profile.xp,
+      level: profile.level,
+      levelName: computeLevel(profile.xp).levelName
+    }));
+    setCompletedQuizzes((current) => ({
+      ...current,
+      [quizId]: { score: result.score, totalQ: result.total, completedAt: new Date().toISOString() }
+    }));
+    return result;
   };
 
   // Handler when evidence is submitted
-  const handleSubmitComplete = (payload) => {
-    const xpReward = selectedMission?.xpReward || 50;
-    const newXp = childProfile.xp + xpReward;
-    const { level, levelName } = computeLevel(newXp);
-
-    const badgeId = selectedMission?.badgeId || 'water_saver';
-    const unlockedBadges = [...childProfile.unlockedBadges];
-    if (badgeId && !unlockedBadges.includes(badgeId)) {
-      unlockedBadges.push(badgeId);
+  const handleSubmitComplete = async (payload) => {
+    const form = new FormData();
+    form.set('missionId', payload.missionId);
+    form.set('caption', payload.caption || '');
+    form.set('type', payload.type || 'photo');
+    form.set('frame', payload.frame || 'water');
+    form.set('stickers', JSON.stringify(payload.stickers || []));
+    if (payload.file) {
+      form.set('evidence', payload.file);
+    } else if (payload.mediaDataUrl?.startsWith('data:image/')) {
+      const image = await fetch(payload.mediaDataUrl).then((response) => response.blob());
+      form.set('evidence', image, 'drawing.png');
     }
-
-    const newPage = {
-      id: `page_${Date.now()}`,
-      sdgId: selectedMission?.sdgId || 6,
-      sdgNumber: selectedMission?.sdgNumber || 6,
-      title: selectedMission?.title || 'Eco Adventure',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      caption: payload.caption || 'Completed real-world sustainability challenge!',
-      type: payload.type || 'photo',
-      mediaUrl: payload.mediaUrl,
-      frame: payload.frame || 'water',
-      stickers: payload.stickers || ['💧', '⭐'],
-      xpEarned: xpReward,
-      badgeName: selectedMission?.badgeName || 'SDG Achiever',
-      badgeIcon: selectedMission?.badgeIcon || '⭐',
+    const result = await apiJson('/api/submissions', { method: 'POST', body: form });
+    setAppMessage(result.status === 'suspicious'
+      ? 'Your evidence was flagged for human review. An image signal is not proof that evidence is inauthentic.'
+      : 'Your evidence was submitted for review. XP and badges are awarded only after approval.');
+    const pages = await apiJson('/api/student/book-pages');
+    setBookPages(pages.map((page) => ({
+      ...page,
+      sdgId: page.sdg_number,
+      sdgNumber: page.sdg_number,
+      frame: page.frame_id,
+      xpEarned: page.xp_earned,
+      badgeName: page.badge_name,
+      badgeIcon: page.badge_icon,
+      stickers: page.stickers,
       author: childProfile.name
-    };
-
-    const newPages = [...bookPages, newPage];
-
-    const updatedProfile = {
-      ...childProfile,
-      xp: newXp,
-      level,
-      levelName,
-      unlockedBadges,
-      pagesCount: newPages.length
-    };
-
-    setChildProfile(updatedProfile);
-    setBookPages(newPages);
-    saveSession(role, updatedProfile, newPages, completedQuizzes);
-
-    // Also notify server backend if active
-    fetch('/api/submissions?autoApprove=true', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, childName: childProfile.name })
-    }).catch(() => {});
-
-    // Trigger celebration modal with confetti & audio
-    triggerCelebration({
-      xpEarned: xpReward,
-      badgeName: selectedMission?.badgeName || 'SDG Achiever',
-      badgeIcon: selectedMission?.badgeIcon || '⭐',
-      missionTitle: selectedMission?.title || 'Eco Action'
-    });
-
+    })));
     setIsSubmittingMission(null);
     setSelectedMission(null);
     setActiveTab('home');
@@ -306,62 +417,84 @@ export default function App() {
   };
 
   // Teacher verification handler
-  const handleVerifySubmission = (subId, status, comment) => {
-    fetch(`/api/submissions/${subId}/verify`, {
+  const handleVerifySubmission = async (subId, status, comment) => {
+    try {
+      await apiJson(`/api/submissions/${subId}/review`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, teacherComment: comment })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.childProfile) setChildProfile(data.childProfile);
-        if (data.bookPages) setBookPages(data.bookPages);
-      })
-      .catch(() => {});
-
-    setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status, teacherComment: comment } : s));
+      body: JSON.stringify({ status, comment })
+      });
+      setSubmissions(await apiJson('/api/submissions'));
+      setTeacherData(await apiJson('/api/teacher'));
+    } catch (error) {
+      setAppMessage(error.message);
+    }
   };
 
   // Teacher custom mission creator
-  const handleCreateMission = (newMission) => {
-    const fullMission = {
-      ...newMission,
-      id: `m_custom_${Date.now()}`,
-      status: 'available',
-      checklistItems: ['Plan Action 📝', 'Perform Eco Habit 🌿', 'Reflect & Share 💬']
-    };
-
-    fetch('/api/missions', {
+  const handleCreateMission = async (newMission) => {
+    try {
+      const saved = await apiJson('/api/missions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fullMission)
-    })
-      .then(res => res.json())
-      .then(saved => setMissions(prev => [...prev, saved]))
-      .catch(() => {
-        setMissions(prev => [...prev, fullMission]);
+      body: JSON.stringify({
+        title: newMission.title,
+        description: newMission.challengeText,
+        sdg_number: newMission.sdgNumber,
+        xp_reward: newMission.xpReward,
+        badge_name: newMission.badgeName,
+        class_id: teacherData.classes?.[0]?.id
+      })
       });
+      setMissions((current) => [...current, saved]);
+    } catch (error) {
+      setAppMessage(error.message);
+    }
   };
 
   // Summer day complete handler
-  const handleCompleteSummerDay = (dayNum) => {
-    if (!summerData.completedDays.includes(dayNum)) {
-      const updated = {
-        ...summerData,
-        completedDays: [...summerData.completedDays, dayNum]
-      };
+  const handleCompleteSummerDay = async (dayNum) => {
+    try {
+      const updated = await apiJson(`/api/student/summer/${dayNum}/complete`, { method: 'POST' });
       setSummerData(updated);
-      const newXp = childProfile.xp + 20;
-      const { level, levelName } = computeLevel(newXp);
-      const updatedProfile = { ...childProfile, xp: newXp, level, levelName };
-      setChildProfile(updatedProfile);
-      saveSession(role, updatedProfile, bookPages, completedQuizzes);
+    } catch (error) {
+      setAppMessage(error.message);
+    }
+  };
+
+  const handleCreateFamilyMission = async (mission) => {
+    if (!selectedParentChild) return;
+    try {
+      const saved = await apiJson(`/api/parent/children/${selectedParentChild.id}/family-missions`, {
+        method: 'POST',
+        body: JSON.stringify(mission)
+      });
+      setFamilyMissions((current) => [saved, ...current]);
+    } catch (error) {
+      setAppMessage(error.message);
+    }
+  };
+
+  const handleCompleteFamilyMission = async (missionId) => {
+    try {
+      const saved = await apiJson(`/api/parent/family-missions/${missionId}/complete`, { method: 'POST' });
+      setFamilyMissions((current) => current.map((mission) => mission.id === missionId ? saved : mission));
+    } catch (error) {
+      setAppMessage(error.message);
     }
   };
 
   // If not logged in, render the Role Selection / Entry screen!
+  if (!authReady) {
+    return <div className="min-h-screen bg-living-planet flex items-center justify-center text-slate-700 font-bold">Checking secure session...</div>;
+  }
   if (!isLoggedIn) {
-    return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
+    return <AuthScreen
+      onLoginSuccess={handleLoginSuccess}
+      passwordRecovery={passwordRecovery}
+      onPasswordUpdated={() => {
+        setPasswordRecovery(false);
+        setIsLoggedIn(false);
+      }}
+    />;
   }
 
   return (
@@ -369,11 +502,6 @@ export default function App() {
       {/* Top Header Role Switcher Bar */}
       <RoleSwitcher
         currentRole={role}
-        onRoleChange={(r) => {
-          setRole(r);
-          setShowCertificateGen(false);
-          setActiveTab('home');
-        }}
         onSwitchUser={handleSwitchUser}
         childProfile={childProfile}
         teacherData={teacherData}
@@ -384,6 +512,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1">
+        {appMessage && <div role="status" className="max-w-5xl mx-auto mt-3 px-4"><p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{appMessage}<button className="float-right" onClick={() => setAppMessage('')} aria-label="Dismiss message">×</button></p></div>}
         {role === 'child' && (
           <>
             {activeTab === 'home' && (
@@ -430,14 +559,17 @@ export default function App() {
                 onSaveAvatar={(av) => {
                   const updatedProfile = { ...childProfile, avatar: av };
                   setChildProfile(updatedProfile);
-                  saveSession('child', updatedProfile, bookPages, completedQuizzes);
-                  fetch('/api/profile', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ avatar: av })
-                  }).catch(() => {});
+                  apiJson('/api/profile', { method: 'PATCH', body: JSON.stringify({ avatar: av }) }).catch((error) => setAppMessage(error.message));
                 }}
               />
+            )}
+
+            {activeTab === 'profile' && studentInviteCode && (
+              <div className="max-w-4xl mx-auto px-4 -mt-20 pb-24">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+                  Parent link code: <code className="select-all">{studentInviteCode}</code>
+                </div>
+              </div>
             )}
 
             {activeTab === 'summer' && (
@@ -485,14 +617,26 @@ export default function App() {
         )}
 
         {role === 'parent' && (
-          <ParentDashboard
-            parentDigest={parentDigest}
-            childProfile={childProfile}
-            onOpenBook={() => {
-              setRole('child');
-              setActiveTab('book');
-            }}
-          />
+          parentBookOpen ? (
+            <BookView
+              bookPages={bookPages}
+              childName={childProfile.name}
+              onBackToHome={() => setParentBookOpen(false)}
+              onNavigateToMissions={() => setParentBookOpen(false)}
+            />
+          ) : (
+            <ParentDashboard
+              parentDigest={parentDigest}
+              childProfile={childProfile}
+              children={parentChildren}
+              approvedSubmissions={submissions}
+              familyMissions={familyMissions}
+              onSelectChild={loadParentChild}
+              onCreateFamilyMission={handleCreateFamilyMission}
+              onCompleteFamilyMission={handleCompleteFamilyMission}
+              onOpenBook={() => setParentBookOpen(true)}
+            />
+          )
         )}
       </main>
 

@@ -24,7 +24,7 @@ export function TeacherDashboard({ teacherData, submissions = [], onVerifySubmis
   const handleReject = (subId) => {
     playClickSound();
     const comment = feedbackInput[subId] || 'Please add a photo or drawing showing your action! 🌿';
-    onVerifySubmission(subId, 'rejected', comment);
+    onVerifySubmission(subId, 'needs_resubmission', comment);
   };
 
   const handleCreateSubmit = (e) => {
@@ -99,7 +99,7 @@ export function TeacherDashboard({ teacherData, submissions = [], onVerifySubmis
           </div>
           <div>
             <div className="text-xs font-bold text-slate-500 uppercase">Students Enrolled</div>
-            <div className="text-2xl font-black text-slate-900">{teacherData?.totalStudents || 32} Students</div>
+            <div className="text-2xl font-black text-slate-900">{teacherData?.totalStudents || 0} Students</div>
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export function TeacherDashboard({ teacherData, submissions = [], onVerifySubmis
           </div>
           <div>
             <div className="text-xs font-bold text-slate-500 uppercase">Mission Completion</div>
-            <div className="text-2xl font-black text-emerald-600">{teacherData?.completionRate || 84}% Avg</div>
+            <div className="text-2xl font-black text-emerald-600">{teacherData?.completionRate || 0}% Avg</div>
           </div>
         </div>
 
@@ -123,6 +123,12 @@ export function TeacherDashboard({ teacherData, submissions = [], onVerifySubmis
           </div>
         </div>
       </div>
+
+      {teacherData?.classes?.length > 0 && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm font-bold text-indigo-950">
+          Student class code: <code className="select-all">{teacherData.classes[0].invite_code}</code>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
@@ -176,6 +182,14 @@ export function TeacherDashboard({ teacherData, submissions = [], onVerifySubmis
                       🟡 Pending Review
                     </span>
                   </div>
+
+                  {sub.image_screening?.authenticity && (
+                    <div className={`rounded-xl border p-2 text-xs font-bold ${sub.image_screening.authenticity.status === 'suspicious' ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                      Screening: {sub.image_screening.authenticity.status.replaceAll('_', ' ')}
+                      {typeof sub.image_screening.authenticity.confidence === 'number' && ` (${Math.round(sub.image_screening.authenticity.confidence * 100)}%)`}
+                      <span className="block font-medium">{sub.image_screening.authenticity.reason}</span>
+                    </div>
+                  )}
 
                   <p className="text-xs font-bold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                     "{sub.caption}"
@@ -242,7 +256,8 @@ export function TeacherDashboard({ teacherData, submissions = [], onVerifySubmis
                 </div>
                 <div>
                   <h4 className="font-black text-slate-900 text-sm">{s.name}</h4>
-                  <p className="text-xs text-slate-500 font-medium">Level {s.level} • {s.xp} XP</p>
+                  <p className="text-xs text-slate-500 font-medium">{s.grade || 'Student'} • Level {s.level} • {s.xp} XP</p>
+                  {s.badges?.length > 0 && <p className="mt-1 text-[10px] font-bold text-amber-800">Badges: {s.badges.join(', ')}</p>}
                   <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200 inline-block mt-1">
                     📖 {s.bookPages} Book Pages
                   </span>

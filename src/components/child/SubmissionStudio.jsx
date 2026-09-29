@@ -5,11 +5,13 @@ import { playClickSound, playSuccessSound } from '../../audio/soundFx.js';
 
 export function SubmissionStudio({ mission, onBack, onSubmitComplete }) {
   const [subType, setSubType] = useState('photo'); // 'photo', 'drawing', 'text'
-  const [photoUrl, setPhotoUrl] = useState('https://images.unsplash.com/photo-1541888946425-d0fbb186a5b7?auto=format&fit=crop&w=600&q=80');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
   const [caption, setCaption] = useState('I turned off the tap while brushing my teeth for 3 days!');
   const [selectedFrame, setSelectedFrame] = useState('water');
   const [activeStickers, setActiveStickers] = useState(['💧', '⭐']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
 
   // Drawing Canvas State
   const canvasRef = useRef(null);
@@ -72,6 +74,13 @@ export function SubmissionStudio({ mission, onBack, onSubmitComplete }) {
   const handlePhotoUpload = (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 6 * 1024 * 1024) {
+        setSubmissionError('Choose a JPEG, PNG, or WebP image smaller than 6 MB.');
+        e.target.value = '';
+        return;
+      }
+      setSubmissionError('');
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         setPhotoUrl(uploadEvent.target.result);
@@ -91,29 +100,36 @@ export function SubmissionStudio({ mission, onBack, onSubmitComplete }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (subType === 'photo' && !photoFile) {
+      setSubmissionError('Choose a photo to submit.');
+      return;
+    }
+    if (subType === 'text' && !caption.trim()) {
+      setSubmissionError('Write a reflection before submitting.');
+      return;
+    }
     playSuccessSound();
     setIsSubmitting(true);
-
-    let mediaData = photoUrl;
-    if (subType === 'drawing' && canvasRef.current) {
-      mediaData = canvasRef.current.toDataURL('image/png');
-    }
+    setSubmissionError('');
 
     const payload = {
       missionId: mission.id,
-      childName: 'Leo',
       type: subType,
-      mediaUrl: mediaData,
+      file: subType === 'photo' ? photoFile : null,
+      mediaDataUrl: subType === 'drawing' && canvasRef.current ? canvasRef.current.toDataURL('image/png') : null,
       caption,
       frame: selectedFrame,
       stickers: activeStickers
     };
 
-    setTimeout(() => {
+    try {
+      await onSubmitComplete(payload);
+    } catch (error) {
+      setSubmissionError(error.message || 'Your evidence could not be submitted. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      onSubmitComplete(payload);
-    }, 800);
+    }
   };
 
   const frameObj = FRAMES.find(f => f.id === selectedFrame) || FRAMES[0];
@@ -188,11 +204,11 @@ export function SubmissionStudio({ mission, onBack, onSubmitComplete }) {
             {/* Display Photo */}
             {subType === 'photo' && (
               <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-100 border border-slate-200 group">
-                <img
-                  src={photoUrl}
-                  alt="Submission"
-                  className="w-full h-full object-cover"
-                />
+                {photoUrl ? (
+                  <img src={photoUrl} alt="Selected mission evidence" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-sm font-bold text-slate-500">Choose a photo to preview</div>
+                )}
 
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <label className="cursor-pointer bg-white text-slate-900 font-black text-xs px-4 py-2 rounded-xl shadow hover:bg-slate-100 transition-colors flex items-center gap-1.5">
@@ -200,7 +216,7 @@ export function SubmissionStudio({ mission, onBack, onSubmitComplete }) {
                     <span>Change Photo</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       onChange={handlePhotoUpload}
                       className="hidden"
                     />
@@ -354,6 +370,8 @@ export function SubmissionStudio({ mission, onBack, onSubmitComplete }) {
             />
           </div>
         </div>
+
+        {submissionError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">{submissionError}</p>}
 
         {/* Submit CTA */}
         <button
